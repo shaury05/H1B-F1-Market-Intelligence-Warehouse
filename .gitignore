@@ -1,0 +1,7 @@
+raw_data/
+csv_staging/
+__pycache__/
+.DS_Store
+*.pyc
+.venv/
+outputs/master_h1b_cube_2024_2026.csv

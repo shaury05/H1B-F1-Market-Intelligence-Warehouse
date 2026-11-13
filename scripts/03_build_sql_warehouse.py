@@ -1,0 +1,148 @@
+import pymssql
+import pandas as pd
+from sqlalchemy import create_engine
+
+conn = pymssql.connect(server="localhost", port=1433, user="sa", password="StrongPassword123!", database="H1B_Analytics_DW", autocommit=True)
+cursor = conn.cursor()
+
+print("1. Creating dbo.Dim_Company_NAICS_USCIS (with Initial F-1/H-1B Approval metrics)...")
+cursor.execute("""
+CREATE OR ALTER VIEW dbo.Dim_Company_NAICS_USCIS AS
+WITH Cleaned_USCIS AS (
+    SELECT 
+        LTRIM(RTRIM(
+            REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+                UPPER(EMPLOYER_PETITIONER_NAME),
+                ',', ''), '.', ''), ' LLC', ''), ' INC', ''), ' CORP', ''), ' CORPORATION', ''), ' LIMITED', '')
+        )) AS EMPLOYER_CLEAN_KEY,
+        INDUSTRY_NAICS_CODE AS NAICS_SECTOR,
+        ISNULL(TRY_CAST(REPLACE(CAST(NEW_EMPLOYMENT_APPROVAL AS VARCHAR), ',', '') AS INT), 0) AS NEW_H1B_APPROVALS,
+        ISNULL(TRY_CAST(REPLACE(CAST(NEW_EMPLOYMENT_DENIAL AS VARCHAR), ',', '') AS INT), 0) AS NEW_H1B_DENIALS,
+        ISNULL(TRY_CAST(REPLACE(CAST(CONTINUATION_APPROVAL AS VARCHAR), ',', '') AS INT), 0) AS CONT_H1B_APPROVALS
+    FROM dbo.Stg_USCIS_H1B
+    WHERE EMPLOYER_PETITIONER_NAME IS NOT NULL
+),
+Aggregated_USCIS AS (
+    SELECT 
+        EMPLOYER_CLEAN_KEY,
+        MAX(NAICS_SECTOR) AS NAICS_SECTOR,
+        SUM(NEW_H1B_APPROVALS) AS USCIS_INITIAL_APPROVALS_24_26,
+        SUM(NEW_H1B_DENIALS) AS USCIS_INITIAL_DENIALS_24_26,
+        SUM(CONT_H1B_APPROVALS) AS USCIS_CONTINUING_APPROVALS_24_26
+    FROM Cleaned_USCIS
+    WHERE NAICS_SECTOR IS NOT NULL
+    GROUP BY EMPLOYER_CLEAN_KEY
+)
+SELECT * FROM Aggregated_USCIS;
+""")
+
+print("2. Creating dbo.Dim_Company_EVerify (Active Open STEM OPT Employers)...")
+cursor.execute("""
+CREATE OR ALTER VIEW dbo.Dim_Company_EVerify AS
+WITH Ranked_EV AS (
+    SELECT 
+        LTRIM(RTRIM(
+            REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+                UPPER(EMPLOYER),
+                ',', ''), '.', ''), ' LLC', ''), ' INC', ''), ' CORP', ''), ' CORPORATION', ''), ' LIMITED', '')
+        )) AS EMPLOYER_CLEAN_KEY,
+        ACCOUNT_STATUS AS EVERIFY_STATUS,
+        WORKFORCE_SIZE,
+        HIRING_SITE_LOCATIONS,
+        ROW_NUMBER() OVER (
+            PARTITION BY LTRIM(RTRIM(
+                REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+                    UPPER(EMPLOYER),
+                    ',', ''), '.', ''), ' LLC', ''), ' INC', ''), ' CORP', ''), ' CORPORATION', ''), ' LIMITED', '')
+            ))
+            ORDER BY CASE WHEN ACCOUNT_STATUS = 'Open' THEN 1 ELSE 2 END
+        ) AS rn
+    FROM dbo.Stg_EVerify_Employers
+    WHERE EMPLOYER IS NOT NULL
+)
+SELECT EMPLOYER_CLEAN_KEY, EVERIFY_STATUS, WORKFORCE_SIZE, HIRING_SITE_LOCATIONS
+FROM Ranked_EV
+WHERE rn = 1;
+""")
+
+print("3. Creating Master View dbo.vw_Master_H1B_Intelligence...")
+cursor.execute("""
+CREATE OR ALTER VIEW dbo.vw_Master_H1B_Intelligence AS
+SELECT 
+    l.CASE_NUMBER,
+    l.CASE_STATUS,
+    YEAR(TRY_CAST(l.DECISION_DATE AS DATE)) AS DECISION_YEAR,
+    DATEPART(QUARTER, TRY_CAST(l.DECISION_DATE AS DATE)) AS DECISION_QUARTER,
+    UPPER(LTRIM(RTRIM(l.JOB_TITLE))) AS JOB_TITLE,
+    l.SOC_CODE,
+    UPPER(LTRIM(RTRIM(l.SOC_TITLE))) AS SOC_TITLE,
+    UPPER(LTRIM(RTRIM(l.EMPLOYER_NAME))) AS EMPLOYER_NAME_RAW,
+    LTRIM(RTRIM(
+        REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+            UPPER(l.EMPLOYER_NAME),
+            ',', ''), '.', ''), ' LLC', ''), ' INC', ''), ' CORP', ''), ' CORPORATION', ''), ' LIMITED', '')
+    )) AS EMPLOYER_CLEAN_KEY,
+    ISNULL(u.NAICS_SECTOR, 'Unmapped / Other') AS NAICS_SECTOR,
+    ISNULL(u.USCIS_INITIAL_APPROVALS_24_26, 0) AS USCIS_INITIAL_APPROVALS_24_26,
+    CASE WHEN ev.EVERIFY_STATUS = 'Open' THEN 1 ELSE 0 END AS IS_EVERIFY_OPEN,
+    ISNULL(ev.WORKFORCE_SIZE, 'Unknown') AS WORKFORCE_SIZE,
+    l.WORKSITE_CITY,
+    l.WORKSITE_STATE,
+    l.PW_WAGE_LEVEL,
+    ISNULL(TRY_CAST(l.NEW_EMPLOYMENT AS INT), 0) AS NEW_EMPLOYMENT_COUNT,
+    ISNULL(TRY_CAST(l.CONTINUED_EMPLOYMENT AS INT), 0) AS CONTINUED_EMPLOYMENT_COUNT,
+    CASE 
+        WHEN l.WAGE_UNIT_OF_PAY = 'Year' THEN TRY_CAST(l.WAGE_RATE_OF_PAY_FROM AS FLOAT)
+        WHEN l.WAGE_UNIT_OF_PAY = 'Hour' THEN TRY_CAST(l.WAGE_RATE_OF_PAY_FROM AS FLOAT) * 2080.0
+        WHEN l.WAGE_UNIT_OF_PAY = 'Month' THEN TRY_CAST(l.WAGE_RATE_OF_PAY_FROM AS FLOAT) * 12.0
+        WHEN l.WAGE_UNIT_OF_PAY = 'Bi-Weekly' THEN TRY_CAST(l.WAGE_RATE_OF_PAY_FROM AS FLOAT) * 26.0
+        WHEN l.WAGE_UNIT_OF_PAY = 'Week' THEN TRY_CAST(l.WAGE_RATE_OF_PAY_FROM AS FLOAT) * 52.0
+        ELSE NULL
+    END AS ANNUAL_SALARY,
+    CASE 
+        WHEN l.PW_UNIT_OF_PAY = 'Year' THEN TRY_CAST(l.PREVAILING_WAGE AS FLOAT)
+        WHEN l.PW_UNIT_OF_PAY = 'Hour' THEN TRY_CAST(l.PREVAILING_WAGE AS FLOAT) * 2080.0
+        WHEN l.PW_UNIT_OF_PAY = 'Month' THEN TRY_CAST(l.PREVAILING_WAGE AS FLOAT) * 12.0
+        WHEN l.PW_UNIT_OF_PAY = 'Bi-Weekly' THEN TRY_CAST(l.PREVAILING_WAGE AS FLOAT) * 26.0
+        WHEN l.PW_UNIT_OF_PAY = 'Week' THEN TRY_CAST(l.PREVAILING_WAGE AS FLOAT) * 52.0
+        ELSE NULL
+    END AS ANNUAL_PREVAILING_WAGE
+FROM dbo.Fact_LCA_Filings l
+LEFT JOIN dbo.Dim_Company_NAICS_USCIS u
+    ON LTRIM(RTRIM(
+        REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+            UPPER(l.EMPLOYER_NAME),
+            ',', ''), '.', ''), ' LLC', ''), ' INC', ''), ' CORP', ''), ' CORPORATION', ''), ' LIMITED', '')
+    )) = u.EMPLOYER_CLEAN_KEY
+LEFT JOIN dbo.Dim_Company_EVerify ev
+    ON LTRIM(RTRIM(
+        REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+            UPPER(l.EMPLOYER_NAME),
+            ',', ''), '.', ''), ' LLC', ''), ' INC', ''), ' CORP', ''), ' CORPORATION', ''), ' LIMITED', '')
+    )) = ev.EMPLOYER_CLEAN_KEY
+WHERE l.VISA_CLASS = 'H-1B';
+""")
+conn.close()
+
+print("\n4. Running Verification Query (Top 10 E-Verify Sponsors for Entry-Level Roles in 2025-2026)...")
+engine = create_engine("mssql+pymssql://sa:StrongPassword123!@localhost:1433/H1B_Analytics_DW")
+verify_df = pd.read_sql("""
+SELECT TOP 10
+    EMPLOYER_CLEAN_KEY AS COMPANY,
+    NAICS_SECTOR,
+    SOC_TITLE,
+    WORKSITE_STATE AS STATE,
+    COUNT(*) AS CERTIFIED_LCAS_25_26,
+    SUM(CASE WHEN PW_WAGE_LEVEL IN ('I', 'II', 'Level I', 'Level II') AND NEW_EMPLOYMENT_COUNT > 0 THEN 1 ELSE 0 END) AS F1_ENTRY_HIRES,
+    MAX(USCIS_INITIAL_APPROVALS_24_26) AS USCIS_NEW_H1B_APPROVALS,
+    ROUND(AVG(ANNUAL_SALARY), 0) AS AVG_SALARY
+FROM dbo.vw_Master_H1B_Intelligence
+WHERE CASE_STATUS = 'Certified'
+  AND DECISION_YEAR IN (2025, 2026)
+  AND IS_EVERIFY_OPEN = 1
+  AND NAICS_SECTOR <> 'Unmapped / Other'
+  AND ANNUAL_SALARY BETWEEN 45000 AND 600000
+GROUP BY EMPLOYER_CLEAN_KEY, NAICS_SECTOR, SOC_TITLE, WORKSITE_STATE
+ORDER BY F1_ENTRY_HIRES DESC;
+""", engine)
+print(verify_df.to_string(index=False))
