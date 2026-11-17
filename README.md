@@ -62,6 +62,12 @@ To solve this at enterprise scale, I architected a multi-tier data warehouse in 
 - **Maximum Likelihood Estimation (MLE):** Fitted a Log-Normal distribution to right-skewed annualized H-1B salaries ($N = 1,238,350$), obtaining $\hat{\mu}\_{\text{MLE}} = 11.6827$ and $\hat{\sigma}\_{\text{MLE}} = 0.3899$.
 - **Law of Total Variance ($\text{Var}(Y) = \mathbb{E}\[\text{Var}(Y \mid X)\] + \text{Var}(\mathbb{E}\[Y \mid X\])$):** Decomposed total salary variance ($3.02 \times 10^9$) into **Within-State Mean Variance ($4.06 \times 10^9$)** versus **Between-State Variance ($3.81 \times 10^8$)**. Within-state variance is **10.6x larger** than between-state variance, proving that **company tier, `NAICS` industry, and `SOC` role** drive compensation far more than state geography alone.
 
+## 3. Core Statistical, Econometric & Machine Learning Findings
+
+### A. Parametric Modeling & Variance Decomposition
+- **Maximum Likelihood Estimation (MLE):** Fitted a Log-Normal distribution to right-skewed annualized H-1B salaries ($N = 1,238,350$), obtaining $\hat{\mu}\_{\text{MLE}} = 11.6827$ and $\hat{\sigma}\_{\text{MLE}} = 0.3899$.
+- **Law of Total Variance ($\text{Var}(Y) = \mathbb{E}\lbrack\text{Var}(Y \mid X)\rbrack + \text{Var}(\mathbb{E}\lbrack Y \mid X\rbrack)$):** Decomposed total salary variance ($3.02 \times 10^9$) into **Within-State Mean Variance ($4.06 \times 10^9$)** versus **Between-State Variance ($3.81 \times 10^8$)**. Within-state variance is **10.6x larger** than between-state variance, proving that **company tier, `NAICS` industry, and `SOC` role** drive compensation far more than state geography alone.
+
 ### B. Two-Way ANOVA, Non-Parametric Bootstrapping & FDR Control (Python & R)
 - **Two-Way ANOVA (`statsmodels` & R `aov()`):** Tested main effects of `NAICS_SECTOR` ($SS = 2.13 \times 10^{13}, p \lt 10^{-16}$) and `PW_WAGE_LEVEL` ($SS = 5.55 \times 10^{13}, p \lt 10^{-16}$) on offered compensation, alongside Benjamini-Hochberg adjusted pairwise $t$-tests comparing **Healthcare (`NAICS 62`)** against **Information & Tech Services (`NAICS 51/54`)**.
 - **Percentile Bootstrapping & Benjamini-Hochberg (FDR):** Executed Mann-Whitney $U$ tests and 500-iteration Percentile Bootstrapping across the top 15 worksite states with **Benjamini-Hochberg False Discovery Rate ($\alpha = 0.05$)** control:
@@ -71,24 +77,12 @@ To solve this at enterprise scale, I architected a multi-tier data warehouse in 
 
 ### C. Distribution Drift, Empirical Bayes Shrinkage & PCA
 - **Labor Market Drift (`FY 2024` to `FY 2026`):** Computed **Population Stability Index ($\text{PSI} = 0.1389$)** and **Kullback-Leibler Divergence ($D\_{\text{KL}} = 0.0717$)** across the top 30 occupation titles, quantifying the structural hiring shift toward AI, Data Science, and Cloud Infrastructure roles.
-- **Empirical Bayes Beta-Binomial Shrinkage:** Applied a conjugate $\text{Beta}(\alpha\_0 = 95, \beta\_0 = 5)$ prior to shrink noisy small-sample employer approval rates toward the industry baseline:
-
-  $$
-  \hat{\theta}_i = \frac{c_i + \alpha_0}{n_i + \alpha_0 + \beta_0}
-  $$
-
+- **Empirical Bayes Beta-Binomial Shrinkage:** Applied a conjugate $\text{Beta}(\alpha\_0 = 95, \beta\_0 = 5)$ prior to shrink noisy small-sample employer approval rates toward the industry baseline: $\displaystyle \hat{\theta}\_i = \frac{c\_i + \alpha\_0}{n\_i + \alpha\_0 + \beta\_0}$
 - **Dimensionality Reduction (PCA):** Compressed 4 standardized employer metrics (`Total Filings`, `Mean Salary`, `F-1 Entry Hires`, `Bayesian Approval Rate`) across the top 300 sponsors into 2 principal components capturing **81.9% of total variance**.
 
 ### D. Predictive Modeling & Time Series Forecasting
-- **Salary Benchmarking (`XGBoost` vs. `Polynomial GLM`):** Trained a degree-2 Polynomial OLS model ($\text{Adjusted } R^2 = 0.6505$) and a gradient-boosted **XGBoost Regressor ($R^2 = 0.6859, \text{MAE} = \text{\$}18,044$)** to predict expected compensation and prevailing wage premiums.
+- **Salary Benchmarking (`XGBoost` vs. `Polynomial GLM`):** Trained a degree-2 Polynomial OLS model ($\text{Adjusted } R^2 = 0.6505$) and a gradient-boosted **XGBoost Regressor ($R^2 = 0.6859$, $\text{MAE} = \text{USD } 18,044$)** to predict expected compensation and prevailing wage premiums.
 - **Time Series Forecasting (`ETS` vs. `ARIMA`):** Modeled quarterly filing volume using **Holt-Winters Exponential Smoothing ($\text{ETS MAE} = 47,834$)** vs. **ARIMA(1,1,0) ($\text{MAE} = 83,635$)**, reducing out-of-sample forecast error by **42.8%**.
----
-
-## 4. Interactive Application Modules & Engineering Guardrails
-1. **Tab 1 — Multi-Select Role, Company & State Explorer:** Supports simultaneous filtering across multiple states, multiple `NAICS` sectors, multiple standardized `SOC` occupations, and comma-separated role keywords using exact **filing-weighted salary aggregation**.
-2. **Tab 2 — Deterministic Text-to-SQL Assistant:** Translates natural-language questions (including multi-state, multi-role, and salary-threshold queries) into executable **DuckDB SQL** with read-only syntax guardrails that block destructive operations.
-3. **Tab 3 — Statistical & ML Inference Lab:** Interactive Plotly visualizations for state Bootstrap 95% CIs, PCA employer clusters, and Empirical Bayes sponsor reliability rankings.
-4. **Tab 4 — Student Salary & Target Sponsor Calculator:** Computes filing-weighted expected salary, 25th–75th percentile prevailing wage baselines, and the top 15 active E-Verify sponsors for any combination of target states and roles.
 
 ---
 
