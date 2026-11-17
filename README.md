@@ -59,8 +59,8 @@ To solve this at enterprise scale, I architected a multi-tier data warehouse in 
 ## 3. Core Statistical, Econometric & Machine Learning Findings
 
 ### A. Parametric Modeling & Variance Decomposition
-* **Maximum Likelihood Estimation (MLE):** Fitted a Log-Normal distribution to right-skewed annualized H-1B salaries ($N = 1,238,350$), obtaining $\hat{\mu}_{\text{MLE}} = 11.6827$ and $\hat{\sigma}_{\text{MLE}} = 0.3899$.
-* **Law of Total Variance ($\text{Var}(Y) = \mathbb{E}[\text{Var}(Y \mid X)] + \text{Var}(\mathbb{E}[Y \mid X])$):** Decomposed total salary variance ($3.02 \times 10^9$) into **Within-State Mean Variance ($4.06 \times 10^9$)** versus **Between-State Variance ($3.81 \times 10^8$)**. Within-state variance is **10.6x larger** than between-state variance, proving that **company tier, `NAICS` industry, and `SOC` role** drive compensation far more than state geography alone.
+- **Maximum Likelihood Estimation (MLE):** Fitted a Log-Normal distribution to right-skewed annualized H-1B salaries ($N = 1,238,350$), obtaining $\hat{\mu}\_{\text{MLE}} = 11.6827$ and $\hat{\sigma}\_{\text{MLE}} = 0.3899$.
+- **Law of Total Variance ($\text{Var}(Y) = \mathbb{E}\[\text{Var}(Y \mid X)\] + \text{Var}(\mathbb{E}\[Y \mid X\])$):** Decomposed total salary variance ($3.02 \times 10^9$) into **Within-State Mean Variance ($4.06 \times 10^9$)** versus **Between-State Variance ($3.81 \times 10^8$)**. Within-state variance is **10.6x larger** than between-state variance, proving that **company tier, `NAICS` industry, and `SOC` role** drive compensation far more than state geography alone.
 
 ### B. Two-Way ANOVA, Non-Parametric Bootstrapping & FDR Control (Python & R)
 * **Two-Way ANOVA (`statsmodels` & R `aov()`):** Tested main effects of `NAICS_SECTOR` ($SS = 2.13 \times 10^{13}, p < 10^{-16}$) and `PW_WAGE_LEVEL` ($SS = 5.55 \times 10^{13}, p < 10^{-16}$) on offered compensation, alongside Benjamini-Hochberg adjusted pairwise $t$-tests comparing **Healthcare (`NAICS 62`)** against **Information & Tech Services (`NAICS 51/54`)**.
