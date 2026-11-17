@@ -82,7 +82,6 @@ To solve this at enterprise scale, I architected a multi-tier data warehouse in 
 ### D. Predictive Modeling & Time Series Forecasting
 - **Salary Benchmarking (`XGBoost` vs. `Polynomial GLM`):** Trained a degree-2 Polynomial OLS model ($\text{Adjusted } R^2 = 0.6505$) and a gradient-boosted **XGBoost Regressor ($R^2 = 0.6859, \text{MAE} = \text{\$}18,044$)** to predict expected compensation and prevailing wage premiums.
 - **Time Series Forecasting (`ETS` vs. `ARIMA`):** Modeled quarterly filing volume using **Holt-Winters Exponential Smoothing ($\text{ETS MAE} = 47,834$)** vs. **ARIMA(1,1,0) ($\text{MAE} = 83,635$)**, reducing out-of-sample forecast error by **42.8%**.
-
 ---
 
 ## 4. Interactive Application Modules & Engineering Guardrails
