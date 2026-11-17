@@ -1,13 +1,13 @@
 # US H-1B & F-1 STEM OPT Market Intelligence Platform (FY 2024–2026)
 
-[![Live Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://h1b-f1-market-intelligence.streamlit.app)
+[![Live Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://h1b-f1-market-intelligence.streamlit.app/)
 ![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
 ![MS SQL Server](https://img.shields.io/badge/MS_SQL_Server-T--SQL_Warehouse-CC2927?logo=microsoftsqlserver&logoColor=white)
 ![R Statistical Computing](https://img.shields.io/badge/R-ANOVA_%26_GLM-276DC3?logo=r&logoColor=white)
 ![DuckDB](https://img.shields.io/badge/DuckDB-In--Memory_OLAP-FFF000?logo=duckdb&logoColor=black)
 
 **Author:** Shaury Pratap Singh (M.S. in Data Science, New Jersey Institute of Technology)  
-**GitHub Repository:** [github.com/shaury05/H1B-F1-Market-Intelligence-Warehouse](https://github.com/shaury05/H1B-F1-Market-Intelligence-Warehouse)  
+**Live Interactive Web App:** [h1b-f1-market-intelligence.streamlit.app](https://h1b-f1-market-intelligence.streamlit.app/)  
 **Executive Audit Workbook:** [`outputs/H1B_Executive_Audit_Workbook.xlsx`](outputs/H1B_Executive_Audit_Workbook.xlsx)
 
 ---
@@ -58,8 +58,6 @@ To solve this at enterprise scale, I architected a multi-tier data warehouse in 
 
 ## 3. Core Statistical, Econometric & Machine Learning Findings
 
-## 3. Core Statistical, Econometric & Machine Learning Findings
-
 ### A. Parametric Modeling & Variance Decomposition
 - **Maximum Likelihood Estimation (MLE):** Fitted a Log-Normal distribution to right-skewed annualized H-1B salaries ($N = 1,238,350$), obtaining $\hat{\mu}\_{\text{MLE}} = 11.6827$ and $\hat{\sigma}\_{\text{MLE}} = 0.3899$.
 - **Law of Total Variance ($`\text{Var}(Y) = \mathbb{E}[\text{Var}(Y \mid X)] + \text{Var}(\mathbb{E}[Y \mid X])`$):** Decomposed total salary variance ($3.02 \times 10^9$) into **Within-State Mean Variance ($4.06 \times 10^9$)** versus **Between-State Variance ($3.81 \times 10^8$)**. Within-state variance is **10.6x larger** than between-state variance, proving that **company tier, `NAICS` industry, and `SOC` role** drive compensation far more than state geography alone.
@@ -79,6 +77,14 @@ To solve this at enterprise scale, I architected a multi-tier data warehouse in 
 ### D. Predictive Modeling & Time Series Forecasting
 - **Salary Benchmarking (`XGBoost` vs. `Polynomial GLM`):** Trained a degree-2 Polynomial OLS model ($\text{Adjusted } R^2 = 0.6505$) and a gradient-boosted **XGBoost Regressor ($R^2 = 0.6859$, $\text{MAE} = \text{USD } 18,044$)** to predict expected compensation and prevailing wage premiums.
 - **Time Series Forecasting (`ETS` vs. `ARIMA`):** Modeled quarterly filing volume using **Holt-Winters Exponential Smoothing ($\text{ETS MAE} = 47,834$)** vs. **ARIMA(1,1,0) ($\text{MAE} = 83,635$)**, reducing out-of-sample forecast error by **42.8%**.
+
+---
+
+## 4. Interactive Application Modules & Engineering Guardrails
+1. **Tab 1 — Multi-Select Role, Company & State Explorer:** Supports simultaneous filtering across multiple states, multiple `NAICS` sectors, multiple standardized `SOC` occupations, and comma-separated role keywords using exact **filing-weighted salary aggregation**.
+2. **Tab 2 — Deterministic Text-to-SQL Assistant:** Translates natural-language questions (including multi-state, multi-role, and salary-threshold queries) into executable **DuckDB SQL** with read-only syntax guardrails that block destructive operations.
+3. **Tab 3 — Statistical & ML Inference Lab:** Interactive Plotly visualizations for state Bootstrap 95% CIs, PCA employer clusters, and Empirical Bayes sponsor reliability rankings.
+4. **Tab 4 — Student Salary & Target Sponsor Calculator:** Computes filing-weighted expected salary, 25th–75th percentile prevailing wage baselines, and the top 15 active E-Verify sponsors for any combination of target states and roles.
 
 ---
 
